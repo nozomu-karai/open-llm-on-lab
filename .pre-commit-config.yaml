@@ -3,6 +3,6 @@ repos:
     hooks:
       - id: lint
         name: lint
-        entry: bash -c 'make lint'
+        entry: bash -c 'poetry run make lint'
         language: system
         types: [python]
