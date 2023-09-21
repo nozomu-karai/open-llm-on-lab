@@ -1,0 +1,6 @@
+# model is {7, 13, 70}b
+model_name: meta-llama/Llama-2-7b-chat-hf
+
+hydra:
+  job:
+    chdir: True
