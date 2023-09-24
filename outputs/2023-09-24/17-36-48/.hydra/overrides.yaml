@@ -1,2 +1,0 @@
-- model.device_map=cuda
-- model.torch_dtype=float16
