@@ -1,0 +1,2 @@
+- model.device_map=cuda
+- model.load_in_8bit=True

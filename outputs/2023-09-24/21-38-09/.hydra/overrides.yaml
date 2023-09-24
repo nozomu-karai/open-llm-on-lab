@@ -1,0 +1,2 @@
+- dataset.batch_size=32
+- model.torch_dtype=float16

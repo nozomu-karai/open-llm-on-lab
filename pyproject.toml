@@ -18,6 +18,7 @@ optimum = "^1.13.2"
 auto-gptq = "^0.4.2"
 humanize = "^4.8.0"
 gputil = "^1.4.0"
+tqdm = "^4.66.1"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^6.1.0"

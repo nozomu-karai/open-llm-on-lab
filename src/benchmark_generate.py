@@ -4,31 +4,34 @@ from logging import getLogger
 import hydra
 import psutil
 import torch
+from torch.utils.data import DataLoader, Subset
+from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 
+from dataset import LimaTestDataset
+
 logger = getLogger(__name__)
-set_seed(0)
 
 
 @torch.no_grad()
-def bench_generate(cfg, model, tokenizer, prompt, device):
+def bench_generate(cfg, model, tokenizer, dataloader, device):
+    output_sequences = []
+    n_generated_token = 0
     start = time.time()
-    input_ids = tokenizer(
-        prompt,
-        return_tensors="pt",
-        padding="max_length",
-        max_length=cfg.max_length,
-    ).to(device)
-    output = model.generate(**input_ids, **cfg.generate)
-    output_sequence = tokenizer.batch_decode(output, skip_special_tokens=True)
+    for batch in tqdm(dataloader):
+        batch = {k: v.squeeze(1).to(device) for k, v in batch.items()}
+        output = model.generate(**batch, **cfg.generate)
+        output_sequence = tokenizer.batch_decode(output, skip_special_tokens=True)
+        output_sequences.extend(output_sequence)
+        n_generated_token += output.numel() - batch["input_ids"].numel()
     end = time.time()
     elapsed = end - start
-    n_generated_token = output.numel() - input_ids["input_ids"].numel()
     logger.info(f"Inference Time: {elapsed:.2f} sec")
     logger.info(f"Generate speed: {n_generated_token / elapsed:.2f} token/sec")
     info_max_gpu_memory()
+    logger.info(f"RAM usage: {psutil.virtual_memory().used / 1024 ** 3:.2f} GB")
 
-    return output_sequence
+    return output_sequences
 
 
 def info_max_gpu_memory():
@@ -43,25 +46,44 @@ def info_max_gpu_memory():
 @hydra.main(version_base="1.1", config_path="../configs", config_name="generate.yaml")
 def main(cfg):
     device = "cuda" if cfg.model.device_map != "cpu" else "cpu"
+    set_seed(cfg.seed)
 
     logger.info("---- Load model ----")
     start = time.time()
     model_name = cfg.model.pretrained_model_name_or_path
+    if cfg.model.torch_dtype == "float16":
+        torch_dtype = torch.float16
+    elif cfg.model.torch_dtype == "bfloat16":
+        torch_dtype = torch.bfloat16
+    elif cfg.model.torch_dtype == "float32":
+        torch_dtype = torch.float32
+    else:
+        assert False, f"Invalid torch_dtype: {cfg.model.torch_dtype}"
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding_side="left")
-    tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(**cfg.model)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.bos_token
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch_dtype,
+        load_in_4bit=cfg.model.load_in_4bit,
+        load_in_8bit=cfg.model.load_in_8bit,
+        device_map=cfg.model.device_map,
+    )
     end = time.time()
     logger.info(f"Model Loading Time: {end - start:.2f} sec")
-    logger.info(f"RAM usage: {psutil.virtual_memory().used / 1024 ** 3:.2f} GB")
     info_max_gpu_memory()
+    logger.info(f"RAM usage: {psutil.virtual_memory().used / 1024 ** 3:.2f} GB")
 
-    prompt = ["The highest mountain in the world is", "My name is"]
+    logger.info("---- Load dataset ----")
+    dataset = LimaTestDataset(cfg, tokenizer=tokenizer)
+    min_datasize = min(len(dataset), cfg.dataset.datasize)
+    sub_dataset = Subset(dataset, list(range(min_datasize)))
+    dataloader = DataLoader(sub_dataset, batch_size=cfg.dataset.batch_size, num_workers=cfg.dataset.num_workers)
+    logger.info(f"Dataset size: {min_datasize}")
 
     logger.info("---- Inference ----")
-    output_sequence = bench_generate(cfg, model, tokenizer, prompt, device)
-
-    print(f"Input: {prompt}")
-    print(f"Output: {output_sequence}")
+    output_sequences = bench_generate(cfg, model, tokenizer, dataloader, device)
+    print(output_sequences[0])
 
 
 if __name__ == "__main__":
