@@ -4,6 +4,7 @@ from logging import getLogger
 import hydra
 import psutil
 import torch
+from dotenv import load_dotenv
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
@@ -11,6 +12,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 from dataset import LimaTestDataset
 
 logger = getLogger(__name__)
+load_dotenv()
 
 
 @torch.no_grad()
