@@ -1,5 +1,21 @@
-# model is {7, 13, 70}b
-model_name: meta-llama/Llama-2-7b-chat-hf
+model:
+  pretrained_model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+  # pretrained_model_name_or_path: cyberagent/open-calm-7b 
+  device_map: auto
+  load_in_4bit: False
+  load_in_8bit: False
+
+
+generate:
+  max_new_tokens: 20
+  do_sample: True
+  num_beams: 1
+  num_return_sequences: 1
+
+max_length: 50
+
+dataset:
+  data_path: /mnt/mint/karai/dataset/lima
 
 hydra:
   job:
