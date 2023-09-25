@@ -1,3 +1,4 @@
+import contextlib
 import time
 from logging import getLogger
 
@@ -45,6 +46,17 @@ def info_max_gpu_memory():
     logger.info(f"total GPU memory: {total_gpu_mem:.2f} GB")
 
 
+def maybe_autocast(dtype, device):
+    # if on cpu, don't use autocast
+    # if on gpu, use autocast with dtype if provided, otherwise use torch.float16
+    enable_autocast = device != torch.device("cpu")
+
+    if enable_autocast:
+        return torch.cuda.amp.autocast(dtype=dtype)
+    else:
+        return contextlib.nullcontext()
+
+
 @hydra.main(version_base="1.1", config_path="../configs", config_name="generate.yaml")
 def main(cfg):
     device = "cuda" if cfg.model.device_map != "cpu" else "cpu"
@@ -76,15 +88,16 @@ def main(cfg):
     info_max_gpu_memory()
     logger.info(f"RAM usage: {psutil.virtual_memory().used / 1024 ** 3:.2f} GB")
 
-    logger.info("---- Load dataset ----")
-    dataset = LimaTestDataset(cfg, tokenizer=tokenizer)
-    min_datasize = min(len(dataset), cfg.dataset.datasize)
-    sub_dataset = Subset(dataset, list(range(min_datasize)))
-    dataloader = DataLoader(sub_dataset, batch_size=cfg.dataset.batch_size, num_workers=cfg.dataset.num_workers)
-    logger.info(f"Dataset size: {min_datasize}")
+    with maybe_autocast(dtype=torch_dtype, device=device):
+        logger.info("---- Load dataset ----")
+        dataset = LimaTestDataset(cfg, tokenizer=tokenizer)
+        min_datasize = min(len(dataset), cfg.dataset.datasize)
+        sub_dataset = Subset(dataset, list(range(min_datasize)))
+        dataloader = DataLoader(sub_dataset, batch_size=cfg.dataset.batch_size, num_workers=cfg.dataset.num_workers)
+        logger.info(f"Dataset size: {min_datasize}")
 
-    logger.info("---- Inference ----")
-    output_sequences = bench_generate(cfg, model, tokenizer, dataloader, device)
+        logger.info("---- Inference ----")
+        output_sequences = bench_generate(cfg, model, tokenizer, dataloader, device)
     print(output_sequences[0])
 
 

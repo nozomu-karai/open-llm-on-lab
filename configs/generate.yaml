@@ -1,8 +1,8 @@
 seed: 1
 
 model:
-  pretrained_model_name_or_path: meta-llama/Llama-2-7b-chat-hf
-  # pretrained_model_name_or_path: TheBloke/Llama-2-7b-Chat-GPTQ
+  # pretrained_model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+  pretrained_model_name_or_path: TheBloke/Llama-2-7b-Chat-GPTQ
   # pretrained_model_name_or_path: cyberagent/open-calm-7b 
   device_map: auto
   torch_dtype: float32
@@ -15,6 +15,7 @@ generate:
   do_sample: True
   num_beams: 1
   num_return_sequences: 1
+  remove_invalid_values: True
 
 max_length: 100
 
