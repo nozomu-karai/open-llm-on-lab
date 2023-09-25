@@ -11,12 +11,12 @@ model:
 
 
 generate:
-  max_new_tokens: 20
+  max_new_tokens: 100
   do_sample: True
   num_beams: 1
   num_return_sequences: 1
 
-max_length: 20
+max_length: 100
 
 dataset:
   data_path: /mnt/mint/karai/dataset/lima/test.jsonl
